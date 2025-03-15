@@ -1,11 +1,9 @@
 fastapi
 openai>=1.0.0
 python-dotenv>=1.0.0
-opentelemetry-api>=1.20.0
-opentelemetry-sdk>=1.20.0
-opentelemetry-exporter-otlp>=1.20.0
-# Additional exporters for non-Docker tracing options
-opentelemetry-exporter-console>=1.20.0
-opentelemetry-exporter-zipkin>=1.20.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
+# PDF generation dependencies
+markdown>=3.4.0
+weasyprint>=59.0
+python-multipart>=0.0.6

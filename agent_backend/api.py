@@ -1,9 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import asyncio
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
+import io
 
 # Import environment setup to ensure it's loaded
 import env_setup
@@ -17,6 +19,9 @@ from llm_main import (
     evaluate_quiz_understanding,
     Runner
 )
+
+# Import PDF generation utilities
+from pdf_generator import markdown_to_html, html_to_pdf, generate_content_markdown
 
 # Set up logging
 logging.basicConfig(
@@ -80,6 +85,10 @@ class ContentResponse(BaseModel):
 
 class UnderstandingScore(BaseModel):
     scores: Dict[str, float]
+
+class MarkdownContent(BaseModel):
+    content: str
+    title: Optional[str] = "Study Plan"
 
 @app.post("/generate-topics", response_model=TopicResponse)
 async def generate_topics(request: TopicRequest):
@@ -226,4 +235,118 @@ async def complete_flow(request: TopicRequest, quiz_submission: QuizSubmission):
         }
     except Exception as e:
         logger.error(f"Error in complete flow: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error in complete flow: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error in complete flow: {str(e)}")
+
+@app.post("/generate-pdf-from-content")
+async def generate_pdf_from_content(content: ContentResponse, title: str = "Study Plan"):
+    try:
+        logger.info(f"Generating PDF from content with {len(content.topic)} sections")
+        
+        # Generate markdown from content
+        markdown_content = generate_content_markdown(content, title)
+        
+        # Convert markdown to HTML
+        html_content = markdown_to_html(markdown_content, title)
+        
+        # Convert HTML to PDF
+        pdf_bytes = html_to_pdf(html_content)
+        
+        # Return the PDF as a downloadable file
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={title.replace(' ', '-').lower()}.pdf"}
+        )
+    except Exception as e:
+        logger.error(f"PDF generation failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+@app.post("/generate-pdf-from-file")
+async def generate_pdf_from_file(markdown_file: UploadFile = File(...), title: str = "Study Plan"):
+    """
+    Generate a PDF from a markdown file.
+    """
+    try:
+        logger.info(f"Generating PDF from uploaded file: {markdown_file.filename}")
+        
+        # Read the markdown content
+        content = await markdown_file.read()
+        markdown_text = content.decode("utf-8")
+        
+        # Convert markdown to HTML
+        html_content = markdown_to_html(markdown_text, title)
+        
+        # Convert HTML to PDF
+        pdf_bytes = html_to_pdf(html_content)
+        
+        # Return the PDF as a downloadable file
+        filename = markdown_file.filename.replace('.md', '.pdf') if markdown_file.filename.endswith('.md') else 'study-plan.pdf'
+        
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"PDF generation failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+@app.post("/generate-pdf-from-text")
+async def generate_pdf_from_text(markdown_data: MarkdownContent):
+    """
+    Generate a PDF from markdown text.
+    """
+    try:
+        logger.info(f"Generating PDF from markdown text with title: {markdown_data.title}")
+        
+        # Convert markdown to HTML
+        html_content = markdown_to_html(markdown_data.content, markdown_data.title)
+        
+        # Convert HTML to PDF
+        pdf_bytes = html_to_pdf(html_content)
+        
+        # Return the PDF as a downloadable file
+        filename = markdown_data.title.replace(' ', '-').lower() + '.pdf'
+        
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"PDF generation failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+
+@app.post("/complete-flow-with-pdf")
+async def complete_flow_with_pdf(request: TopicRequest, quiz_submission: QuizSubmission):
+    """
+    Complete flow that returns a PDF of the content.
+    """
+    try:
+        logger.info(f"Starting complete flow with PDF for subject: {request.subject}")
+        
+        # Run the complete flow
+        flow_result = await complete_flow(request, quiz_submission)
+        
+        # Generate PDF from the content
+        content = flow_result["content"]
+        title = f"{request.subject} Study Plan"
+        
+        # Generate markdown from content
+        markdown_content = generate_content_markdown(content, title)
+        
+        # Convert markdown to HTML
+        html_content = markdown_to_html(markdown_content, title)
+        
+        # Convert HTML to PDF
+        pdf_bytes = html_to_pdf(html_content)
+        
+        # Return the PDF directly
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={title.replace(' ', '-').lower()}.pdf"}
+        )
+    except Exception as e:
+        logger.error(f"Error in complete flow with PDF: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error in complete flow with PDF: {str(e)}") 

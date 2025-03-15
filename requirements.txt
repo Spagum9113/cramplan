@@ -7,3 +7,5 @@ opentelemetry-exporter-otlp>=1.20.0
 # Additional exporters for non-Docker tracing options
 opentelemetry-exporter-console>=1.20.0
 opentelemetry-exporter-zipkin>=1.20.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0

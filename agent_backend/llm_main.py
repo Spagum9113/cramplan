@@ -8,7 +8,12 @@ from openai.types.responses import (
     ResponseCreatedEvent,  # start of new event like tool call or final answer
     ResponseTextDeltaEvent
 )
-load_dotenv()
+
+# Import environment setup to ensure it's loaded
+import env_setup
+
+# Remove duplicate load_dotenv and environment variable setting
+# since it's now handled by env_setup
 
 class ListOfTopics(BaseModel):
     topics: list[str]  # Now it's a list of strings

@@ -14,15 +14,19 @@ import env_setup
 
 # Remove duplicate load_dotenv and environment variable setting
 # since it's now handled by env_setup
+class Topic(BaseModel):
+    topic: str
+    description: str
+    subtopics: list[str]
 
 class ListOfTopics(BaseModel):
-    topics: list[str]  # Now it's a list of strings
+    list_of_topics: list[Topic]  # Now it's a list of strings
 
 main_topic_outline_agent = Agent(
     name="main_topic_outline_agent",
     instructions="""
     Generate five main topics based on the user's input. 
-    Return them in this format:
+    For each topic, provide a description and a list of 3 subtopics.
     """,
     output_type=ListOfTopics
 )
@@ -52,22 +56,27 @@ class ListOfQuizQuestions(BaseModel):
 
 open_quiz_agent = Agent(
     name="open_quiz_agent",
-    instructions="Read the given list of topics, and create 10 multiple choice quiz of a,b,c,d that covers all the topics.",
+    instructions="Read the given list of topics, and create 10 multiple choice quiz of a,b,c,d that covers all the topics. The correct answer should be a,b,c,d",
     output_type=ListOfQuizQuestions,
 )
 
-class ContentText(BaseModel):
+class ContentSub(BaseModel):
+    sub_topic_title: str
+    sub_content_text: str
+
+class ContentMain(BaseModel):
     topic_title: str
-    content_text: str
+    main_description: str
+    subtopics: list[ContentSub]
 
 class ContentTopic(BaseModel):
-     topic: list[ContentText] 
+     topic: list[ContentMain] 
 
 
 
 content_writer_agent = Agent(
     name="content_writer_agent",
-    instructions="You will be given a list of topics, for each topic, you will write a content for the topic to about 500+ words. In the content, you will explain the topic and multiple subtopics that are related to the topic. At the end give a summary of the content.",
+    instructions="""You will be given a list of topics, for each topic, you will write a general main description for the topic. For each of the topics, you will be given a list of subtopics, you will write the subtopic title and the content for the subtopic. Focus on writing the content of the subtopics to be 1000+ words. In the content of the subtopics, try to add understanding of the key concepts, practical examples, real life applications (if applicable), summary of the subtopic and its connection to other subtopics.""",
     output_type=ContentTopic
 )
 
@@ -176,7 +185,9 @@ async def main():
         # 4. Write the content for the curated_topics
         content_result = await Runner.run(
             content_writer_agent,
-            f"Here are the topics to write content for:\n{curated_topics_string}",  # Pass formatted string
+            f"""Here are the topics to write content for:\n{curated_topics_string}, You need to output the main content, its description and the subtopics with the content for each subtopic.
+"""
+            ,  # Pass formatted string
         )
         print(f"Story: {content_result.final_output}")
 

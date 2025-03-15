@@ -46,8 +46,13 @@ class QuizAnswer(BaseModel):
 class QuizSubmission(BaseModel):
     answers: List[QuizAnswer]
 
+class Topic(BaseModel):
+    topic: str
+    description: str
+    subtopics: List[str]
+
 class TopicResponse(BaseModel):
-    topics: List[str]
+    list_of_topics: List[Topic]
 
 class QuizQuestion(BaseModel):
     topic: str
@@ -61,12 +66,17 @@ class QuizQuestion(BaseModel):
 class QuizResponse(BaseModel):
     list_quiz_questions: List[QuizQuestion]
 
-class ContentText(BaseModel):
+class ContentSub(BaseModel):
+    sub_topic_title: str
+    sub_content_text: str
+
+class ContentMain(BaseModel):
     topic_title: str
-    content_text: str
+    main_description: str
+    subtopics: List[ContentSub]
 
 class ContentResponse(BaseModel):
-    topic: List[ContentText]
+    topic: List[ContentMain]
 
 class UnderstandingScore(BaseModel):
     scores: Dict[str, float]
@@ -83,7 +93,7 @@ async def generate_topics(request: TopicRequest):
             input_prompt,
         )
         
-        logger.info(f"Generated {len(main_topic_result.final_output.topics)} topics")
+        logger.info(f"Generated {len(main_topic_result.final_output.list_of_topics)} topics")
         return main_topic_result.final_output
     except Exception as e:
         logger.error(f"Error generating topics: {str(e)}", exc_info=True)
@@ -92,9 +102,12 @@ async def generate_topics(request: TopicRequest):
 @app.post("/generate-quiz", response_model=QuizResponse)
 async def generate_quiz(topics: TopicResponse):
     try:
-        logger.info(f"Generating quiz for {len(topics.topics)} topics")
+        logger.info(f"Generating quiz for {len(topics.list_of_topics)} topics")
         # Format topics into string
-        topics_string = "\n".join(f"{i+1}. {topic}" for i, topic in enumerate(topics.topics))
+        topics_string = "\n".join(
+            f"{i+1}. {topic.topic}\n   Description: {topic.description}\n   Subtopics: {', '.join(topic.subtopics)}" 
+            for i, topic in enumerate(topics.list_of_topics)
+        )
         
         # Generate quiz questions
         quiz_result = await Runner.run(
@@ -126,9 +139,12 @@ async def evaluate_quiz(topics: TopicResponse, quiz: QuizResponse, submission: Q
 @app.post("/generate-content", response_model=ContentResponse)
 async def generate_content(topics: TopicResponse, understanding: UnderstandingScore):
     try:
-        logger.info(f"Generating content for {len(topics.topics)} topics")
+        logger.info(f"Generating content for {len(topics.list_of_topics)} topics")
         # Format topics and understanding scores
-        topics_string = "\n".join(f"{i+1}. {topic}" for i, topic in enumerate(topics.topics))
+        topics_string = "\n".join(
+            f"{i+1}. {topic.topic}\n   Description: {topic.description}\n   Subtopics: {', '.join(topic.subtopics)}" 
+            for i, topic in enumerate(topics.list_of_topics)
+        )
         understanding_summary = "\nUnderstanding by Topic:\n"
         understanding_summary += "\n".join(
             f"{topic}: {score:.1f}%" 
@@ -138,7 +154,8 @@ async def generate_content(topics: TopicResponse, understanding: UnderstandingSc
         # Generate content
         content_result = await Runner.run(
             content_writer_agent,
-            f"Here are the topics to write content for:\n{topics_string}"
+            f"""Here are the topics to write content for:\n{topics_string}
+You need to output the main content, its description and the subtopics with the content for each subtopic."""
         )
         logger.info(f"Generated content with {len(content_result.final_output.topic)} sections")
         return content_result.final_output
@@ -162,7 +179,7 @@ async def curate_topics(request: TopicRequest, understanding: UnderstandingScore
             f"Here is the main topic:\n{request.subject}\nHere is the understanding of the topic:\n{understanding_string}"
         )
         
-        logger.info(f"Curated {len(curated_result.final_output.topics)} topics")
+        logger.info(f"Curated {len(curated_result.final_output.list_of_topics)} topics")
         return curated_result.final_output
     except Exception as e:
         logger.error(f"Error curating topics: {str(e)}", exc_info=True)
@@ -195,7 +212,7 @@ async def complete_flow(request: TopicRequest, quiz_submission: QuizSubmission):
         curated_topics = await curate_topics(request, understanding)
         
         # 5. Generate content based on curated topics
-        logger.info("Step 5: Generating content")
+        logger.info("Step 5: Generating content with detailed structure")
         content = await generate_content(curated_topics, understanding)
         
         logger.info("Complete flow finished successfully")

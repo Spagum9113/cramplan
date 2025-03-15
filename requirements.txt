@@ -1,1 +1,9 @@
 fastapi
+openai>=1.0.0
+python-dotenv>=1.0.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+# PDF generation dependencies
+markdown>=3.4.0
+weasyprint>=59.0
+python-multipart>=0.0.6

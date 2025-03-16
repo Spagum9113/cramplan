@@ -2,9 +2,21 @@
 
 UNIHACK Hackathon Project - A personalized study assistant that generates customized study plans based on your understanding.
 
-## Overview
+## Repository Structure
 
-CramPlan is a comprehensive learning platform that helps students create personalized study plans based on their understanding of various subjects. The application uses AI to generate study topics, create quizzes, evaluate understanding, and produce detailed study content tailored to the user's needs.
+This repository is organized as a monorepo with Git submodules:
+
+- **agent_backend**: Core backend services for the CramPlan platform
+- **cramplan_frontend**: Frontend application (submodule)
+- **cramplan_voice**: Voice interaction component (submodule)
+
+To clone the repository with all submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/yourusername/cramplan.git
+# or if already cloned:
+git submodule update --init --recursive
+```
 
 ## Features
 
@@ -90,7 +102,10 @@ For detailed instructions on setting up and using the PDF generation functionali
 
 ### Backend Setup
 
-1. Clone the repository
+1. Clone the repository with submodules:
+   ```bash
+   git clone --recurse-submodules https://github.com/yourusername/cramplan.git
+   ```
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
